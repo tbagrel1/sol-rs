@@ -1,7 +1,11 @@
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+use serde_utils::serde_str_enum;
+
+pub const PONG_SLEEP_SECONDS: u64 = 4;
+
+serde_str_enum! {
+    State {
+        Online("online"),
+        ShutdownRequested("shutdown_requested"),
+        ShutdownAccepted("shutdown_accepted"),
     }
 }

@@ -8,3 +8,8 @@ edition = "2018"
 
 [dependencies]
 core = { path = "../core" }
+flow_utils = { git = "https://github.com/tbagrel1/flow_utils" }
+toml = "0.5"
+serde = "1.0"
+reqwest = { version = "0.10", features = ["blocking", "json"] }
+percent-encoding = "2.1"
