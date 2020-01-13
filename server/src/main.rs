@@ -1,11 +1,14 @@
 use serde::{self, Deserialize};
+use serde_json;
 use std::path::Path;
 use std::fs::File;
-use actix_web::{HttpServer, web};
+use actix_web::{HttpServer, web::{self, Data}, Responder, HttpResponse};
 use flow_utils::exit_with;
-use core::State;
-use std::time::Instant;
+use core::{State, PONG_SLEEP_SECONDS};
+use std::time::{Instant, Duration};
 use std::collections::HashMap;
+use std::sync::Mutex;
+use actix_web::web::{Query, Json};
 
 const SETTINGS_FILE_PATH: &'static str = "settings.toml";
 
@@ -28,72 +31,222 @@ fn read_bind_address_from_settings(settings_file_path: &Path) -> Result<String, 
     Ok(format!("{}:{}", settings.ip, port))
 }
 
+#[derive(Serialize)]
 struct InfrastructureStatus(HashMap<String, GroupStatus>);
 
 impl InfrastructureStatus {
+    fn new() -> InfrastructureStatus {
+        InfrastructureStatus(HashMap::new())
+    }
+
+    fn add_fresh(&mut self, group_name: &str, computer_name: &str) -> () {
+        match self.get_mut_group_status(group_name) {
+            Ok(group_status) => group_status.add_fresh(computer_name),
+            Err(_) => {
+                self.0.insert(group_name.to_owned(), GroupStatus::new());
+                self.add_fresh(group_name, computer_name)
+            }
+        }
+    }
+
     fn refresh(&mut self, group_name: &str, computer_name: &str) -> State {
-        State::Online
+        match self.get_mut_computer_status(group_name, computer_name) {
+            Ok(computer_status) => {
+                computer_status.update_pong_date();
+                if computer_status.should_shutdown() {
+                    computer_status.accept_shutdown();
+                    State::ShutdownRequested
+                } else {
+                    computer_status.state
+                }
+            },
+            Err(_) => {
+                self.add_fresh(group_name, computer_name);
+                self.refresh(group_name, computer_name)
+            }
+        }
     }
 
-    fn shutdown_computer(&mut self, group_name: &str, computer_name: &str) -> () {
-
+    fn request_shutdown_computer(&mut self, group_name: &str, computer_name: &str) -> Result<(), String> {
+        self.get_mut_computer_status(group_name, computer_name)
+            .and_then(|computer_status| computer_status.request_shutdown())
     }
 
-    fn shutdown_group(&mut self, group_name: &str, computer_name: &str) -> () {
+    fn request_shutdown_group(&mut self, group_name: &str) -> Result<(), String> {
+        self.get_mut_group_status(group_name)
+            .and_then(|group_status| group_status.request_shutdown())
+    }
 
+    fn get_mut_group_status(&mut self, group_name: &str) -> Result<&mut GroupStatus, String> {
+        self.0.get_mut(group_name)
+            .ok_or_else(|| format!("No group with name \"{}\"", group_name))
+    }
+
+    fn get_mut_computer_status(&mut self, group_name: &str, computer_name: &str) -> Result<&mut ComputerStatus, String> {
+        self.get_mut_group_status(group_name)
+            .and_then(|group_status| group_status.get_mut_computer_status(computer_name))
     }
 
     fn cleanup(&mut self) -> () {
-
+        self.0 = self.0.into_iter()
+            .filter(|(_, group_status)| group_status.has_members())
+            .collect();
+        self.0.iter_mut()
+            .map(|(_, group_status)| group_status.cleanup());
     }
 }
 
+#[derive(Serialize)]
 struct GroupStatus(HashMap<String, ComputerStatus>);
 
 impl GroupStatus {
-    fn may_request_shutdown(&self) -> bool {
-        for (computer_name, computer_status) in self.0.iter() {
-            if computer_status.may_request_shutdown() {
-                return true
-            }
+    fn new() -> GroupStatus {
+        GroupStatus(HashMap::new())
+    }
+
+    fn add_fresh(&mut self, computer_name: &str) -> () {
+        if self.get_mut_computer_status(computer_name).is_err() {
+            self.0.insert(computer_name.to_owned(), ComputerStatus::new());
         }
-        false
+    }
+
+    fn may_request_shutdown(&self) -> bool {
+        self.0.iter()
+            .map(|(_, computer_status)| computer_status.may_request_shutdown())
+            .any()
+    }
+
+    fn request_shutdown(&mut self) -> Result<(), String> {
+        if self.may_request_shutdown() {
+            self.0.iter_mut()
+                .map(|(_, computer_status)| {
+                    if computer_status.may_request_shutdown() { computer_status.request_shutdown().unwrap() }
+                });
+            Ok(())
+        } else {
+            Err(format!("Unable to shutdown a group where no computer is in the online state"))
+        }
+    }
+
+    fn has_members(&self) -> bool {
+        return !self.0.is_empty;
+    }
+
+    fn get_mut_computer_status(&mut self, computer_name: &str) -> Result<&mut ComputerStatus, String> {
+        self.0.get_mut(computer_name)
+            .ok_or_else(|| format!("No computer with name \"{}\" in this group", computer_name))
     }
 
     fn cleanup(&mut self) -> () {
-
+        let cleanup_threshold = Duration::from_secs(4 * PONG_SLEEP_SECONDS);
+        self.0 = self.0.into_iter()
+            .filter(|(_, computer_status)| {
+                computer_status.last_pong_date.elapsed() < cleanup_threshold
+            })
+            .collect();
     }
 }
 
+#[derive(Serialize)]
 struct ComputerStatus {
     state: State,
     last_pong_date: Instant
 }
 
 impl ComputerStatus {
+    fn new() -> ComputerStatus {
+        ComputerStatus {
+            state: State::Online,
+            last_pong_date: Instant::now()
+        }
+    }
+
     fn update_pong_date(&mut self) -> () {
         self.last_pong_date = Instant::now();
     }
 
     fn may_request_shutdown(&self) -> bool {
-        return self.state == State::Online;
+        self.state == State::Online
     }
 
-    fn request_shutdown(&mut self) -> () {
-        if self.state == State::Online {
-            self.state = State::ShutdownRequested
+    fn request_shutdown(&mut self) -> Result<(), String> {
+        if self.may_request_shutdown() {
+            self.state = State::ShutdownRequested;
+            Ok(())
+        } else {
+            Err(format!("Unable to shutdown a computer which is not in the online state"))
         }
     }
 
+    fn should_shutdown(&self) -> bool {
+        self.state == State::ShutdownRequested
+    }
+
     fn accept_shutdown(&mut self) -> () {
-        if self.state == State::ShutdownRequested {
-            self.state = State::ShutdownAccepted
+        self.state = State::ShutdownAccepted
+    }
+}
+
+async fn index_handler() -> impl Responder {
+
+}
+
+#[derive(Deserialize)]
+struct PongSelector {
+    group_name: String,
+    computer_name: String
+}
+
+async fn pong_handler(mut data: Data<Mutex<InfrastructureStatus>>, pong_selector: Query<PongSelector>) -> impl Responder {
+    match data.as_ref().get_mut() {
+        Ok(infrastructure_status) => {
+            let state = infrastructure_status.refresh(&pong_selector.group_name, &pong_selector.computer_name);
+            HttpResponse::Ok()
+                .body(serde_json::to_string(&state).unwrap())
+        },
+        Err(_) => {
+            HttpResponse::InternalServerError()
+                .body(format!("Unable to acquire the lock"))
         }
     }
 }
 
-struct Statuses(HashMap<String, HashMap<String, Status>>);
+#[derive(Deserialize)]
+struct ShutdownSelector {
+    group_name: String,
+    computer_name: Option<String>
+}
 
+async fn shutdown_handler(mut data: Data<Mutex<InfrastructureStatus>>, shutdown_selector: Json<ShutdownSelector>) -> impl Responder {
+    match data.as_ref().get_mut() {
+        Ok(infrastructure_status) => {
+            let result = match shutdown_selector.computer_name.as_ref() {
+                Some(computer_name) => infrastructure_status.request_shutdown_computer(&shutdown_selector.group_name, &computer_name),
+                None => infrastructure_status.request_shutdown_group(&shutdown_selector.group_name)
+            };
+            match result {
+                Ok(_) => HttpResponse::Ok().finish(),
+                Err(msg) => HttpResponse::BadRequest().body(msg)
+            }
+        },
+        Err(_) => {
+            HttpResponse::InternalServerError()
+                .body(format!("Unable to acquire the lock"))
+        }
+    }
+}
+
+async fn status_handler() -> impl Responder {
+    match data.as_ref().get() {
+        Ok(infrastructure_status) => {
+            HttpResponse::Ok().body(serde_json::to_string(&infrastructure_status).unwrap())
+        },
+        Err(_) => {
+            HttpResponse::InternalServerError()
+                .body(format!("Unable to acquire the lock"))
+        }
+    }
+}
 
 
 #[actix_rt::main]
@@ -102,8 +255,11 @@ async fn main() {
     let bind_address = read_bind_address_from_settings(Path::new(SETTINGS_FILE_PATH))
         .unwrap_or_else(exit_with!(1, "{}"));
 
+    let data = Data::new(Mutex::new(InfrastructureStatus::new()));
+
     HttpServer::new(|| {
         App::new()
+            .data(data)
             .route("/", web::get().to(index_handler))
             .route("/api/pong", web::get().to(pong_handler))
             .route("/api/shutdown", web::post().to(shutdown_handler))
