@@ -8,3 +8,7 @@ edition = "2018"
 
 [dependencies]
 core = { path = "../core" }
+actix-web = "2.0"
+flow_utils = { git = "https://github.com/tbagrel1/flow_utils" }
+toml = "0.5"
+serde = { version = "1.0", features = ["derive"] }
