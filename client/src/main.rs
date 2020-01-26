@@ -55,7 +55,7 @@ fn shutdown() -> io::Result<Output> {
         cmd.args(&["/C", "shutdown -s -t 5"]);
     } else {
         cmd = Command::new("sh");
-        cmd.args(&["-c", "shutdown -h now"]);
+        cmd.args(&["-c", "poweroff"]);
     }
     cmd.output()
 }
