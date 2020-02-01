@@ -51,7 +51,7 @@ fn read_settings(settings_file_path: &Path) -> Result<Settings, String> {
 
 fn pong(settings: &Settings) -> Result<State, String> {
     let url = format!(
-        "{}?group={}&computer={}",
+        "{}?group_name={}&computer_name={}",
         &settings.api_pong_url,
         utf8_percent_encode(&settings.group_name, percent_encoding::NON_ALPHANUMERIC),
         utf8_percent_encode(&settings.computer_name, percent_encoding::NON_ALPHANUMERIC),
