@@ -1,16 +1,59 @@
-use serde::{self, Deserialize};
+use std::{
+    mem,
+    io::{
+        self,
+        Read
+    },
+    fs::File,
+    collections::HashMap,
+    sync::Mutex,
+    path::Path,
+    convert::TryFrom,
+    time::{
+        Instant,
+        Duration,
+    },
+};
+
+use actix_web::{
+    App,
+    Responder,
+    HttpResponse,
+    HttpServer,
+    web::{
+        self,
+        Data,
+        Query,
+        Json,
+    },
+};
+use actix_files::{
+    self,
+    NamedFile,
+};
+use actix_htpasswd::{
+    AuthControl,
+    HtpasswdDatabase,
+    user_control_policy::{
+        AnyLoggedUser,
+        Anyone,
+    },
+};
+use serde::{
+    self,
+    Serialize,
+    Deserialize,
+};
 use serde_json;
-use std::path::Path;
-use std::fs::File;
-use actix_web::{HttpServer, web::{self, Data}, Responder, HttpResponse};
 use flow_utils::exit_with;
-use core::{State, PONG_SLEEP_SECONDS};
-use std::time::{Instant, Duration};
-use std::collections::HashMap;
-use std::sync::Mutex;
-use actix_web::web::{Query, Json};
+
+use core::{
+    State,
+    PONG_SLEEP_SECONDS
+};
 
 const SETTINGS_FILE_PATH: &'static str = "settings.toml";
+const HTPASSWD_FILE_PATH: &'static str = ".htpasswd";
 
 #[derive(Deserialize)]
 struct Settings {
@@ -24,7 +67,7 @@ fn read_bind_address_from_settings(settings_file_path: &Path) -> Result<String, 
     let mut contents = String::new();
     file.read_to_string(&mut contents)
         .map_err(|_| format!("Unable to read the file \"{}\"", settings_file_path.display()))?;
-    let mut settings: Settings = toml::from_str(&contents)
+    let settings: Settings = toml::from_str(&contents)
         .map_err(|_| format!("Invalid syntax in settings file \"{}\". Syntax must follow the TOML specification.", settings_file_path.display()))?;
     let port = settings.port.parse::<u16>()
         .map_err(|_| format!("Invalid port!"))?;
@@ -88,11 +131,13 @@ impl InfrastructureStatus {
     }
 
     fn cleanup(&mut self) -> () {
-        self.0 = self.0.into_iter()
+        let mut _self = Self::new();
+        mem::swap(self, &mut _self);
+        self.0 = _self.0.into_iter()
             .filter(|(_, group_status)| group_status.has_members())
             .collect();
         self.0.iter_mut()
-            .map(|(_, group_status)| group_status.cleanup());
+            .for_each(|(_, group_status)| group_status.cleanup());
     }
 }
 
@@ -112,14 +157,13 @@ impl GroupStatus {
 
     fn may_request_shutdown(&self) -> bool {
         self.0.iter()
-            .map(|(_, computer_status)| computer_status.may_request_shutdown())
-            .any()
+            .any(|(_, computer_status)| computer_status.may_request_shutdown())
     }
 
     fn request_shutdown(&mut self) -> Result<(), String> {
         if self.may_request_shutdown() {
             self.0.iter_mut()
-                .map(|(_, computer_status)| {
+                .for_each(|(_, computer_status)| {
                     if computer_status.may_request_shutdown() { computer_status.request_shutdown().unwrap() }
                 });
             Ok(())
@@ -129,7 +173,7 @@ impl GroupStatus {
     }
 
     fn has_members(&self) -> bool {
-        return !self.0.is_empty;
+        return !self.0.is_empty();
     }
 
     fn get_mut_computer_status(&mut self, computer_name: &str) -> Result<&mut ComputerStatus, String> {
@@ -139,7 +183,9 @@ impl GroupStatus {
 
     fn cleanup(&mut self) -> () {
         let cleanup_threshold = Duration::from_secs(4 * PONG_SLEEP_SECONDS);
-        self.0 = self.0.into_iter()
+        let mut _self = Self::new();
+        mem::swap(self, &mut _self);
+        self.0 = _self.0.into_iter()
             .filter(|(_, computer_status)| {
                 computer_status.last_pong_date.elapsed() < cleanup_threshold
             })
@@ -150,6 +196,7 @@ impl GroupStatus {
 #[derive(Serialize)]
 struct ComputerStatus {
     state: State,
+    #[serde(skip_serializing)]
     last_pong_date: Instant
 }
 
@@ -187,8 +234,8 @@ impl ComputerStatus {
     }
 }
 
-async fn index_handler() -> impl Responder {
-
+async fn index_handler(_auth_control: AuthControl<Anyone>) -> impl Responder {
+    NamedFile::open("static/index.html")
 }
 
 #[derive(Deserialize)]
@@ -197,9 +244,9 @@ struct PongSelector {
     computer_name: String
 }
 
-async fn pong_handler(mut data: Data<Mutex<InfrastructureStatus>>, pong_selector: Query<PongSelector>) -> impl Responder {
-    match data.as_ref().get_mut() {
-        Ok(infrastructure_status) => {
+async fn pong_handler(data: InfrastructureData, pong_selector: Query<PongSelector>, _auth_control: AuthControl<Anyone>) -> impl Responder {
+    match data.lock() {
+        Ok(mut infrastructure_status) => {
             let state = infrastructure_status.refresh(&pong_selector.group_name, &pong_selector.computer_name);
             HttpResponse::Ok()
                 .body(serde_json::to_string(&state).unwrap())
@@ -217,9 +264,9 @@ struct ShutdownSelector {
     computer_name: Option<String>
 }
 
-async fn shutdown_handler(mut data: Data<Mutex<InfrastructureStatus>>, shutdown_selector: Json<ShutdownSelector>) -> impl Responder {
-    match data.as_ref().get_mut() {
-        Ok(infrastructure_status) => {
+async fn shutdown_handler(data: InfrastructureData, shutdown_selector: Json<ShutdownSelector>, _auth_control: AuthControl<AnyLoggedUser>) -> impl Responder {
+    match data.lock() {
+        Ok(mut infrastructure_status) => {
             let result = match shutdown_selector.computer_name.as_ref() {
                 Some(computer_name) => infrastructure_status.request_shutdown_computer(&shutdown_selector.group_name, &computer_name),
                 None => infrastructure_status.request_shutdown_group(&shutdown_selector.group_name)
@@ -236,10 +283,11 @@ async fn shutdown_handler(mut data: Data<Mutex<InfrastructureStatus>>, shutdown_
     }
 }
 
-async fn status_handler() -> impl Responder {
-    match data.as_ref().get() {
-        Ok(infrastructure_status) => {
-            HttpResponse::Ok().body(serde_json::to_string(&infrastructure_status).unwrap())
+async fn status_handler(data: InfrastructureData, _auth_control: AuthControl<AnyLoggedUser>) -> impl Responder {
+    match data.lock() {
+        Ok(mut infrastructure_status) => {
+            infrastructure_status.cleanup();
+            HttpResponse::Ok().body(serde_json::to_string(&*infrastructure_status).unwrap())
         },
         Err(_) => {
             HttpResponse::InternalServerError()
@@ -248,24 +296,29 @@ async fn status_handler() -> impl Responder {
     }
 }
 
+type InfrastructureData = Data<Mutex<InfrastructureStatus>>;
 
 #[actix_rt::main]
-async fn main() {
-    // TODO: actix middleware for authentication
+async fn main() -> io::Result<()> {
     let bind_address = read_bind_address_from_settings(Path::new(SETTINGS_FILE_PATH))
         .unwrap_or_else(exit_with!(1, "{}"));
 
-    let data = Data::new(Mutex::new(InfrastructureStatus::new()));
-
     HttpServer::new(|| {
+        let htpasswd_database = HtpasswdDatabase::try_from(Path::new(HTPASSWD_FILE_PATH))
+            .unwrap_or_else(exit_with!(1, "{}"));
+
+        let data = Data::new(Mutex::new(InfrastructureStatus::new()));
+
         App::new()
             .data(data)
-            .route("/", web::get().to(index_handler))
+            .data(htpasswd_database)
+            .service(actix_files::Files::new("/static", "static"))
             .route("/api/pong", web::get().to(pong_handler))
             .route("/api/shutdown", web::post().to(shutdown_handler))
             .route("/api/status", web::get().to(status_handler))
+            .route("/", web::get().to(index_handler))
     })
-        .bind(&bind_address)
+        .bind(&bind_address)?
         .run()
         .await
 }

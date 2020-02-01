@@ -1,15 +1,30 @@
-use std::path::Path;
-use std::fs::File;
-use std::time::Duration;
-use std::thread::sleep;
-use std::process::{Command, Output};
-use std::io::{self, Read};
+use std::{
+    path::Path,
+    fs::File,
+    time::Duration,
+    thread::sleep,
+    process::{
+        Command,
+        Output,
+    },
+    io::{
+        self,
+        Read,
+    },
+};
 
 use percent_encoding::utf8_percent_encode;
-use serde::{self, Deserialize};
-
-use core::{State, PONG_SLEEP_SECONDS};
 use flow_utils::exit_with;
+use serde::{
+    self,
+    Deserialize,
+};
+
+use core::{
+    State,
+    PONG_SLEEP_SECONDS,
+};
+
 
 const SETTINGS_FILE_PATH: &'static str = "settings.toml";
 
