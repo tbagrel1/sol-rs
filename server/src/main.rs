@@ -1,5 +1,4 @@
 use std::{
-    mem,
     io::{
         self,
         Read
@@ -49,7 +48,10 @@ use serde::{
     Deserialize,
 };
 use serde_json;
-use flow_utils::exit_with;
+use flow_utils::{
+    exit_with,
+    Updatable,
+};
 
 use core::{
     State,
@@ -135,11 +137,11 @@ impl InfrastructureStatus {
     }
 
     fn cleanup(&mut self) -> () {
-        let mut _self = Self::new();
-        mem::swap(self, &mut _self);
-        self.0 = _self.0.into_iter()
-            .filter(|(_, group_status)| group_status.has_members())
-            .collect();
+        self.0.self_update(|map| {
+            map.into_iter()
+                .filter(|(_, group_status)| group_status.has_members())
+                .collect()
+        });
         self.0.iter_mut()
             .for_each(|(_, group_status)| group_status.cleanup());
     }
@@ -187,13 +189,13 @@ impl GroupStatus {
 
     fn cleanup(&mut self) -> () {
         let cleanup_threshold = Duration::from_secs(4 * PONG_SLEEP_SECONDS);
-        let mut _self = Self::new();
-        mem::swap(self, &mut _self);
-        self.0 = _self.0.into_iter()
-            .filter(|(_, computer_status)| {
-                computer_status.last_pong_date.elapsed() < cleanup_threshold
-            })
-            .collect();
+        self.0.self_update(|map| {
+            map.into_iter()
+                .filter(|(_, computer_status)| {
+                    computer_status.last_pong_date.elapsed() < cleanup_threshold
+                })
+                .collect()
+        });
     }
 }
 
