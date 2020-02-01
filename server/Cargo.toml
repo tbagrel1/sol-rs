@@ -11,6 +11,7 @@ core = { path = "../core" }
 actix-rt = "1.0"
 actix-web = "2.0"
 actix-files = "0.2"
+actix-cors = "0.2"
 actix_htpasswd = { git = "https://github.com/tbagrel1/actix_htpasswd" }
 flow_utils = { git = "https://github.com/tbagrel1/flow_utils" }
 toml = "0.5"

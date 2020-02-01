@@ -6,7 +6,10 @@ use std::{
     },
     fs::File,
     collections::HashMap,
-    sync::Mutex,
+    sync::{
+        Mutex,
+        Arc,
+    },
     path::Path,
     convert::TryFrom,
     time::{
@@ -31,6 +34,7 @@ use actix_files::{
     self,
     NamedFile,
 };
+use actix_cors::Cors;
 use actix_htpasswd::{
     AuthControl,
     HtpasswdDatabase,
@@ -296,21 +300,28 @@ async fn status_handler(data: InfrastructureData, _auth_control: AuthControl<Any
     }
 }
 
-type InfrastructureData = Data<Mutex<InfrastructureStatus>>;
+type InfrastructureData = Data<Arc<Mutex<InfrastructureStatus>>>;
 
 #[actix_rt::main]
 async fn main() -> io::Result<()> {
     let bind_address = read_bind_address_from_settings(Path::new(SETTINGS_FILE_PATH))
         .unwrap_or_else(exit_with!(1, "{}"));
 
-    HttpServer::new(|| {
+    let data = Arc::new(Mutex::new(InfrastructureStatus::new()));
+
+    HttpServer::new(move || {
         let htpasswd_database = HtpasswdDatabase::try_from(Path::new(HTPASSWD_FILE_PATH))
             .unwrap_or_else(exit_with!(1, "{}"));
 
-        let data = Data::new(Mutex::new(InfrastructureStatus::new()));
-
         App::new()
-            .data(data)
+            // TODO: remove
+            .wrap(
+                Cors::new()
+                    .allowed_origin("http://localhost:10081")
+                    .supports_credentials()
+                    .finish()
+            )
+            .data(data.clone())
             .data(htpasswd_database)
             .service(actix_files::Files::new("/static", "static"))
             .route("/api/pong", web::get().to(pong_handler))
