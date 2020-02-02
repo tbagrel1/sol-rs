@@ -76,6 +76,7 @@ fn shutdown() -> io::Result<Output> {
 }
 
 fn main() {
+    // TODO: change exit_with
     let settings = read_settings(Path::new(SETTINGS_FILE_PATH))
         .unwrap_or_else(exit_with!(1, "{}"));
     let error_sleep_duration = Duration::from_secs(1);

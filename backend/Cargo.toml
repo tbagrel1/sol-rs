@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 core = { path = "../core" }
 actix-rt = "1.0"
-actix-web = { version = "2.0", features = ["ssl"] }
+actix-web = "2.0"
 actix-files = "0.2"
 actix_htpasswd = { git = "https://github.com/tbagrel1/actix_htpasswd" }
 flow_utils = { git = "https://github.com/tbagrel1/flow_utils" }
