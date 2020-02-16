@@ -1,0 +1,91 @@
+name: Build all artefacts on master branch
+on:
+  - push
+
+jobs:
+  build:webpage:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: '12'
+      - name: install npm packages
+        run: |
+          cd webpage
+          npm i
+          cd ..
+      - name: build with webpack
+        run : |
+          cd webpage
+          npm run build-prod
+          cd ..
+      - name: copy artifact to artifact directory
+        run : |
+          mkdir artifacts
+          cp webpage/output/bundle.js artifacts
+      - uses: actions/upload-artifact@v1
+        with:
+            name: sol-rs-webpage
+            path: artifacts
+
+  build:api:linux:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Install OpenSSH dependency
+        run: |
+          apt install libssl-dev
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+            override: true
+      - name: build with cargo
+        run: |
+          cd api
+          cargo build --release
+          cd ..
+      - name: copy artifact to root and add sample config files
+        run: |
+          mkdir artifacts
+          cp api/target/release/sol-rs-api artifacts
+          echo 'admin:{SHA}0DPiKuNIrrVmD8IUCuw1hQxNqZc=' > artifacts/.htpasswd
+          echo -e 'bind_ip = "0.0.0.0"\nbind_port = "8080"\npublic_full_address = "http://192.168.1.10:8080"\n' > artifacts/settings.toml
+      - name: donwload webpage bundle and add it to the artifacts
+        uses: actions/donwload-artifact@v1
+        with:
+          name: sol-rs-webpage
+      - name: add webpage artifacts to api artifacts
+        run: |
+          mkdir artifacts/static
+          cp bundle.js artifacts/static
+      - uses: actions/upload-artifact@v1
+        with:
+            name: sol-rs-api
+            path: artifacts
+
+  build:client:linux:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Install OpenSSH dependency
+        run: |
+          apt install libssl-dev
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+            override: true
+      - name: build with cargo
+        run: |
+          cd client
+          cargo build --release
+          cd ..
+      - name: copy artifact to root and add sample config files
+        run: |
+          mkdir artifacts
+          cp client/target/release/sol-rs-client artifacts
+          echo -e 'api_pong_url = "http://192.168.1.10:8080/api/pong"\ngroup_name = "Salle 1"\ncomputer_name = "PC Win 01-001"\n' > artifacts/settings.toml
+      - uses: actions/upload-artifact@v1
+        with:
+            name: sol-rs-client
+            path: artifacts
