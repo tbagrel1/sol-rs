@@ -1,5 +1,5 @@
 [package]
-name = "client"
+name = "sol-rs-client"
 version = "0.1.0"
 authors = ["Thomas BAGREL <tomsb07@gmail.com>"]
 edition = "2018"
@@ -13,3 +13,8 @@ toml = "0.5"
 serde = { version = "1.0", features = ["derive"] }
 reqwest = { version = "0.10", features = ["blocking", "json"] }
 percent-encoding = "2.1"
+
+[[bin]]
+name = "sol-rs-client"
+path = "src/main.rs"
+
