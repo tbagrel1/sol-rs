@@ -1,7 +1,7 @@
 <template lang="pug">
   b-container(v-if="groups.length > 0" fluid)
-    b-row.pl-3.pt-3
-      b-col.pr-3.pb-3.pl-0.pt-0(v-for="group in groups" :key="group.name" cols="12" lg="6")
+    b-row(align-h="center").pl-3.pt-3
+      b-col.pr-3.pb-3.pl-0.pt-0(v-for="group in groups" :key="group.name" cols="12" xl="6")
         Group(:group="group")
   b-container.mt-3(v-else fluid)
     b-row

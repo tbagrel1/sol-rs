@@ -1,10 +1,10 @@
 <template lang="pug">
   b-container.h-100.p-0(fluid)
-    b-row.m-0
-      b-col.p-0
-        b-card
-          b-card-body
-            b-container.h-100.p-0(fluid)
+    b-row.h-100.m-0
+      b-col.h-100.p-0
+        b-card.h-100
+          b-card-body.h-100
+            b-container.p-0(fluid)
               b-row.m-0
                 b-col.p-0
                   b-container.p-0(fluid)
@@ -16,7 +16,7 @@
                       b-col.center-inside(cols="3")
                         b-btn(:disabled="noneOnline" @click="shutdown" block :variant="noneOnline ? 'secondary' : 'primary'") Arrêter le groupe
               b-row.m-0
-                b-col.p-0.h-100
+                b-col.p-0
                   b-card.mt-3
                     b-card-body.p-0
                       b-container.p-0(fluid)
