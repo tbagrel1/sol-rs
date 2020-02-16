@@ -3,7 +3,7 @@ on:
   - push
 
 jobs:
-  build:webpage:
+  build-webpage:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
@@ -29,7 +29,7 @@ jobs:
             name: sol-rs-webpage
             path: artifacts
 
-  build:api:linux:
+  build-api-linux:
     runs-on: ubuntu-18.04
     steps:
       - name: Install OpenSSH dependency
@@ -64,7 +64,7 @@ jobs:
             name: sol-rs-api
             path: artifacts
 
-  build:client:linux:
+  build-client-linux:
     runs-on: ubuntu-18.04
     steps:
       - name: Install OpenSSH dependency
