@@ -7,11 +7,11 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-core = { path = "../core" }
+sol-rs-core = { path = "../core" }
 actix-rt = "1.0"
 actix-web = "2.0"
 actix-files = "0.2"
-actix_htpasswd = { git = "https://github.com/tbagrel1/actix_htpasswd" }
+actix_htpasswd = { git = "https://github.com/tbagrel1/actix_htpasswd", rev = "1123b1ba348b600c5075cbaa98a31f96ccbb1b08" }
 flow_utils = { git = "https://github.com/tracipsas/flow_utils", rev = "3f317186e636c8995d55566071d5870ac8b48469" }
 toml = "0.5"
 serde = { version = "1.0", features = ["derive"] }
