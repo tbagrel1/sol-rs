@@ -59,10 +59,10 @@ jobs:
       - name: add webpage artifacts to api artifacts
         run: |
           mkdir artifacts/static
-          cp bundle.js artifacts/static
+          cp sol-rs-webpage/bundle.js artifacts/static
       - uses: actions/upload-artifact@v1
         with:
-            name: sol-rs-api
+            name: sol-rs-api-linux
             path: artifacts
 
   build-client-linux:
@@ -89,5 +89,68 @@ jobs:
           echo -e 'api_pong_url = "http://192.168.1.10:8080/api/pong"\ngroup_name = "Salle 1"\ncomputer_name = "PC Win 01-001"\n' > artifacts/settings.toml
       - uses: actions/upload-artifact@v1
         with:
-            name: sol-rs-client
+            name: sol-rs-client-linux
+            path: artifacts
+
+  build-api-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+            override: true
+      - name: build with cargo
+        run: |
+          cd api
+          cargo build --release
+          cd ..
+      - name: copy artifact to root and add sample config files
+        run: |
+          mkdir artifacts
+          cp api/target/release/sol-rs-api artifacts
+          echo admin:{SHA}0DPiKuNIrrVmD8IUCuw1hQxNqZc= > artifacts/.htpasswd
+          (
+            echo bind_ip = "0.0.0.0"
+            echo bind_port = "8080"
+            echo public_full_address = "http://192.168.1.10:8080"
+          ) > artifacts/settings.toml
+      - name: donwload webpage bundle and add it to the artifacts
+        uses: actions/download-artifact@v1
+        with:
+          name: sol-rs-webpage
+      - name: add webpage artifacts to api artifacts
+        run: |
+          mkdir artifacts/static
+          cp sol-rs-webpage/bundle.js artifacts/static
+      - uses: actions/upload-artifact@v1
+        with:
+            name: sol-rs-api-windows
+            path: artifacts
+
+  build-client-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+            override: true
+      - name: build with cargo
+        run: |
+          cd client
+          cargo build --release
+          cd ..
+      - name: copy artifact to root and add sample config files
+        run: |
+          mkdir artifacts
+          cp client/target/release/sol-rs-client artifacts
+          (
+            echo api_pong_url = "http://192.168.1.10:8080/api/pong"
+            echo group_name = "Salle 1"
+            echo computer_name = "PC Win 01-001"
+          ) > artifacts/settings.toml
+      - uses: actions/upload-artifact@v1
+        with:
+            name: sol-rs-client-windows
             path: artifacts
