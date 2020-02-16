@@ -12,7 +12,7 @@ actix-rt = "1.0"
 actix-web = "2.0"
 actix-files = "0.2"
 actix_htpasswd = { git = "https://github.com/tbagrel1/actix_htpasswd" }
-flow_utils = { git = "https://github.com/tbagrel1/flow_utils" }
+flow_utils = { git = "https://github.com/tracipsas/flow_utils", rev = "3f317186e636c8995d55566071d5870ac8b48469" }
 toml = "0.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

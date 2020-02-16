@@ -6,7 +6,7 @@ use std::{
     },
 };
 
-use flow_utils::Updatable;
+use flow_utils::updatable::Updatable;
 use serde::Serialize;
 
 use core::{

@@ -7,5 +7,5 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde_utils = { git = "https://github.com/tbagrel1/serde_utils" }
+serde_utils = { git = "https://github.com/tracipsas/serde_utils", rev = "eb76e72e6b6527d32321e9cbb9f7a7307fe2ae11" }
 serde = "1.0"

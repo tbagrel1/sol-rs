@@ -1,19 +1,28 @@
 <template lang="pug">
-  b-row
-    b-col(cols="12")
-      b-card
-        b-card-title
-          b-container
-            b-row
-              b-col(cols="6")
-                h2 {{ group.name }}
-              b-col(cols="3")
-                div {{ group.computers.length }} machines
-              b-col(cols="3")
-                b-btn(:disabled="noneOnline" @click="shutdown") Arrêter le groupe
-        b-card-body
-          b-container
-            Computer(v-for="computer in group.computers" :key="`${group.name}/${computer.name}`" :computer="computer")
+  b-container.h-100.p-0(fluid)
+    b-row.m-0
+      b-col.p-0
+        b-card
+          b-card-body
+            b-container.h-100.p-0(fluid)
+              b-row.m-0
+                b-col.p-0
+                  b-container.p-0(fluid)
+                    b-row
+                      b-col.center-inside(cols="6")
+                        h2 {{ group.name }}
+                      b-col.center-inside(cols="3")
+                        div {{ group.computers.length }} machines
+                      b-col.center-inside(cols="3")
+                        b-btn(:disabled="noneOnline" @click="shutdown" block :variant="noneOnline ? 'secondary' : 'primary'") Arrêter le groupe
+              b-row.m-0
+                b-col.p-0.h-100
+                  b-card.mt-3
+                    b-card-body.p-0
+                      b-container.p-0(fluid)
+                        b-row(v-for="computer in group.computers" :key="`${group.name}/${computer.name}`")
+                          b-col
+                            Computer(:computer="computer")
 </template>
 
 <script>

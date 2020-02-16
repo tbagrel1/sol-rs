@@ -38,7 +38,7 @@ use serde::{
     Deserialize,
 };
 use serde_json;
-use flow_utils::{
+use flow_utils::process::{
     ProcessResult,
     ProcessError::{
         Unrecoverable,
@@ -176,7 +176,7 @@ async fn status_handler(data: InfrastructureData, _auth_control: AuthControl<Any
 type InfrastructureData = Data<Arc<Mutex<InfrastructureStatus>>>;
 
 #[actix_rt::main]
-async fn main() -> ProcessResult {
+async fn main() -> ProcessResult<()> {
     let settings = read_settings(Path::new(SETTINGS_FILE_PATH))
         .map_err(|msg| InvalidData(msg))?;
 

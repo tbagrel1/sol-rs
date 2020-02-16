@@ -14,7 +14,14 @@ use std::{
 };
 
 use percent_encoding::utf8_percent_encode;
-use flow_utils::exit_with;
+use flow_utils::process::{
+    run_main_process,
+    ProcessResult,
+    ProcessError::{
+        InvalidData,
+        Unrecoverable,
+    },
+};
 use serde::{
     self,
     Deserialize,
@@ -75,10 +82,10 @@ fn shutdown() -> io::Result<Output> {
     cmd.output()
 }
 
-fn main() {
-    // TODO: change exit_with
+#[allow(unreachable_code)]
+fn run() -> ProcessResult<()> {
     let settings = read_settings(Path::new(SETTINGS_FILE_PATH))
-        .unwrap_or_else(exit_with!(1, "{}"));
+        .map_err(|msg| InvalidData(format!("{}", msg)))?;
     let error_sleep_duration = Duration::from_secs(1);
     let pong_sleep_duration = Duration::from_secs(PONG_SLEEP_SECONDS);
 
@@ -94,9 +101,15 @@ fn main() {
 
         if state == State::ShutdownRequested {
             println!("Shutdown requested...");
-            shutdown().unwrap_or_else(exit_with!(2, "Unable to shutdown the computer: {}"));
+            shutdown()
+                .map_err(|msg| Unrecoverable(format!("Unable to shutdown the computer: {}", msg)))?;
         }
 
         sleep(pong_sleep_duration);
     }
+    Ok(())
+}
+
+fn main() -> () {
+    run_main_process(run);
 }

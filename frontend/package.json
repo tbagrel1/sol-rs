@@ -1,5 +1,5 @@
 {
-  "name": "sol-rs",
+  "name": "frontend",
   "version": "0.1.0",
   "description": "Simple client-server system to shutdown distant computers in Rust and Vue",
   "scripts": {
