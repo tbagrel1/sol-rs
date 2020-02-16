@@ -34,7 +34,8 @@ jobs:
     steps:
       - name: Install OpenSSH dependency
         run: |
-          apt install libssl-dev
+          sudo apt update
+          sudo apt install libssl-dev
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
@@ -52,7 +53,7 @@ jobs:
           echo 'admin:{SHA}0DPiKuNIrrVmD8IUCuw1hQxNqZc=' > artifacts/.htpasswd
           echo -e 'bind_ip = "0.0.0.0"\nbind_port = "8080"\npublic_full_address = "http://192.168.1.10:8080"\n' > artifacts/settings.toml
       - name: donwload webpage bundle and add it to the artifacts
-        uses: actions/donwload-artifact@v1
+        uses: actions/download-artifact@v1
         with:
           name: sol-rs-webpage
       - name: add webpage artifacts to api artifacts
@@ -69,7 +70,8 @@ jobs:
     steps:
       - name: Install OpenSSH dependency
         run: |
-          apt install libssl-dev
+          sudo apt update
+          sudo apt install libssl-dev
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
