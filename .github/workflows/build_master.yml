@@ -85,6 +85,10 @@ jobs:
       - name: copy artifact to root and add sample config files
         run: |
           mkdir artifacts
+          ls
+          ls api
+          ls api/target
+          ls api/target/release
           cp client/target/release/sol-rs-client artifacts
           echo -e 'api_pong_url = "http://192.168.1.10:8080/api/pong"\ngroup_name = "Salle 1"\ncomputer_name = "PC Linux 01-001"\n' > artifacts/settings.toml
       - uses: actions/upload-artifact@v1
@@ -108,6 +112,10 @@ jobs:
       - name: copy artifact to root and add sample config files
         run: |
           mkdir artifacts
+          ls
+          ls api
+          ls api/target
+          ls api/target/release
           cp api/target/release/sol-rs-api artifacts
           echo admin:{SHA}0DPiKuNIrrVmD8IUCuw1hQxNqZc= > artifacts/.htpasswd
           echo bind_ip = "0.0.0.0" >> artifacts/settings.toml
